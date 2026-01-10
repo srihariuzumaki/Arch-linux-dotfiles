@@ -6,9 +6,8 @@ Features:
 - Noctalia shell (quickshell)
 - Hyprland compositor
 - Wallpaper-based dynamic theming
-- Custom hacker greeter (QML)
 - Zsh + Starship terminal
-- Dual-profile ready (normal / hacker)
+
 
 ## 🖼 Preview
 (add screenshots)
