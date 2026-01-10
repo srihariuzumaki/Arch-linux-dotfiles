@@ -1,0 +1,7 @@
+#!/bin/bash
+
+IMG_DIR="$HOME/.config/fastfetch/images"
+RANDOM_IMG=$(ls "$IMG_DIR" | shuf -n 1)
+
+exec /usr/bin/fastfetch --kitty "$IMG_DIR/$RANDOM_IMG"
+

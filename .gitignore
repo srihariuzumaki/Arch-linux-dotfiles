@@ -1,0 +1,9 @@
+.cache/
+.local/share/
+.config/google-chrome/
+.config/BraveSoftware/
+.config/Code/
+.config/discord/
+.config/vesktop/
+*.log
+*.db
