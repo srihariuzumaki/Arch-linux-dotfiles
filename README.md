@@ -10,7 +10,7 @@ Features:
 
 
 ## 🖼 Preview
-    <p align="center">
+<p align="center">
   <img src="assets/previews/main-desktop.png" alt="Hero Desktop">
 </p>
 
