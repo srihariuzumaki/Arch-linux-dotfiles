@@ -23,7 +23,7 @@ A dynamic, glass-style Hyprland desktop built on top of **Noctalia (Quickshell)*
 Dynamic tiling, multi-workspace layouts, and floating window support.
 
 <p align="center">
-  <img src="assets/previews/tiling-window.png" width="49%">
+  <img src="assets/previews/tiling-window.png" >
   
 </p>
 
