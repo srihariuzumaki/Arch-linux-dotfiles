@@ -46,6 +46,9 @@ alias cat='bat'
 alias top='btop'
 #alias ff='fastfetch'
 alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias mkdir='mkdir -p'
 
 # ----- GIT -----
 alias gs='git status'
