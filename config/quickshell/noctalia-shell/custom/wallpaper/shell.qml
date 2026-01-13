@@ -23,6 +23,15 @@ Window {
 	visible: true
 
     Component.onCompleted: {
+        // Load favorites from settings
+        if (appSettings.savedFavorites && appSettings.savedFavorites.length > 0) {
+            try {
+                favorites = JSON.parse(appSettings.savedFavorites)
+            } catch (e) {
+                favorites = []
+            }
+        }
+        
         homeProcess.exec(["sh", "-c", "echo $HOME"])
 		mainContent.forceActiveFocus()
     }
@@ -50,17 +59,32 @@ Window {
     property bool settingsOpen: false
     property string searchQuery: ""
     
+    // Favorites
+    property var favorites: []
+    property bool showFavoritesOnly: false
+    
     property var thumbnailPaths: ({})
     
     // Computed property for filtered wallpapers
     property var filteredWallpapers: {
-        if (searchQuery === "") {
-            return wallpapers
+        let result = wallpapers
+        
+        // Apply favorites filter first
+        if (showFavoritesOnly) {
+            result = result.filter(function(wallpaper) {
+                return favorites.indexOf(wallpaper) !== -1
+            })
         }
-        let query = searchQuery.toLowerCase()
-        return wallpapers.filter(function(wallpaper) {
-            return wallpaper.toLowerCase().indexOf(query) !== -1
-        })
+        
+        // Apply search filter
+        if (searchQuery !== "") {
+            let query = searchQuery.toLowerCase()
+            result = result.filter(function(wallpaper) {
+                return wallpaper.toLowerCase().indexOf(query) !== -1
+            })
+        }
+        
+        return result
     }
 
     // Persistent settings for custom directories
@@ -69,8 +93,14 @@ Window {
         category: "WallpaperPicker"
         property string savedWallpaperDir: ""
         property string savedThumbnailDir: ""
+        property string savedFavorites: ""  // JSON string of favorites array
     }
 
+    onFavoritesChanged: {
+        // Save favorites to settings
+        appSettings.savedFavorites = JSON.stringify(favorites)
+    }
+    
     onWallpaperDirChanged: {
         if (wallpaperDir && wallpaperDir !== appSettings.savedWallpaperDir) {
             appSettings.savedWallpaperDir = wallpaperDir
@@ -84,7 +114,7 @@ Window {
 
     function ensureVisible() {
         // Safety check
-        if (wallpapers.length === 0) return;
+        if (filteredWallpapers.length === 0) return;
 
         // Calculate item dimensions
         let itemWidth = (wallpaperGrid.width - (wallpaperGrid.columns - 1) * wallpaperGrid.columnSpacing) / wallpaperGrid.columns
@@ -112,6 +142,25 @@ Window {
             let newPosition = (itemBottom - viewportHeight) / (scrollView.contentHeight - scrollView.height)
             scrollView.ScrollBar.vertical.position = newPosition
         }
+    }
+    
+    function toggleFavorite(wallpaperName) {
+        let index = favorites.indexOf(wallpaperName)
+        let newFavorites = favorites.slice()  // Create a copy
+        
+        if (index === -1) {
+            // Add to favorites
+            newFavorites.push(wallpaperName)
+        } else {
+            // Remove from favorites
+            newFavorites.splice(index, 1)
+        }
+        
+        favorites = newFavorites
+    }
+    
+    function isFavorite(wallpaperName) {
+        return favorites.indexOf(wallpaperName) !== -1
     }
 
     // Process for getting home directory
@@ -318,6 +367,13 @@ Window {
                     searchField.forceActiveFocus()
                     event.accepted = true
                     break
+                case Qt.Key_F:
+                    // Toggle favorite for current wallpaper
+                    if (selectedWallpaper !== "") {
+                        toggleFavorite(selectedWallpaper)
+                    }
+                    event.accepted = true
+                    break
                 case Qt.Key_Left:
                     if (currentIndex > 0) {
                         currentIndex--
@@ -418,6 +474,34 @@ Window {
                                 mainContent.forceActiveFocus()
                             }
                         }
+                    }
+                }
+                
+                // Favorites filter button
+                Button {
+                    id: favoritesBtn
+                    text: showFavoritesOnly ? "★ Favorites" : "☆ All"
+                    onClicked: {
+                        showFavoritesOnly = !showFavoritesOnly
+                        // Reset to first item when filter changes
+                        if (filteredWallpapers.length > 0) {
+                            currentIndex = 0
+                            selectedWallpaper = filteredWallpapers[0]
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 8
+                        color: favoritesBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (favoritesBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
+                        border.color: showFavoritesOnly ? "#ffd700" : colorOutline
+                        border.width: showFavoritesOnly ? 2 : 1
+                    }
+                    contentItem: Text {
+                        text: favoritesBtn.text
+                        color: showFavoritesOnly ? "#ffd700" : colorOnSurface
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
                     }
                 }
 
@@ -592,6 +676,32 @@ Window {
                                     horizontalAlignment: Text.AlignHCenter
                                 }
                             }
+                            
+                            // Favorite star button
+                            Rectangle {
+                                width: 32
+                                height: 32
+                                radius: 16
+                                color: "#000000aa"
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.margins: 8
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        toggleFavorite(modelData)
+                                        mouse.accepted = true
+                                    }
+                                }
+                                
+                                Text {
+                                    text: isFavorite(modelData) ? "★" : "☆"
+                                    color: isFavorite(modelData) ? "#ffd700" : colorOnSurface
+                                    font.pixelSize: 20
+                                    anchors.centerIn: parent
+                                }
+                            }
 
                             Rectangle {
                                 visible: selectedWallpaper === modelData
@@ -624,10 +734,12 @@ Window {
                     text: {
                         if (wallpapers.length === 0) {
                             return "Loading wallpapers..."
+                        } else if (showFavoritesOnly) {
+                            return `Showing ${filteredWallpapers.length} favorite wallpapers`
                         } else if (searchQuery !== "") {
                             return `Showing ${filteredWallpapers.length} of ${wallpapers.length} wallpapers`
                         } else {
-                            return `Loaded ${wallpapers.length} wallpapers`
+                            return `Loaded ${wallpapers.length} wallpapers (${favorites.length} favorites)`
                         }
                     }
                     font.pixelSize: 11
@@ -637,7 +749,7 @@ Window {
                 Item { Layout.fillWidth: true }
                 
                 Text {
-                    text: "Use arrow keys to navigate, / to search, Enter to apply, Esc to quit"
+                    text: "Arrow keys to navigate, F to favorite, / to search, Enter to apply, Esc to quit"
                     font.pixelSize: 11
                     color: colorOutline
                     opacity: 0.7
