@@ -48,8 +48,20 @@ Window {
     property bool hasFfmpeg: false
     property bool hasMatugen: false
     property bool settingsOpen: false
+    property string searchQuery: ""
     
     property var thumbnailPaths: ({})
+    
+    // Computed property for filtered wallpapers
+    property var filteredWallpapers: {
+        if (searchQuery === "") {
+            return wallpapers
+        }
+        let query = searchQuery.toLowerCase()
+        return wallpapers.filter(function(wallpaper) {
+            return wallpaper.toLowerCase().indexOf(query) !== -1
+        })
+    }
 
     // Persistent settings for custom directories
     Labs.Settings {
@@ -239,6 +251,8 @@ Window {
                     currentIndex = 0
                     selectedWallpaper = wallpapers[0]
                 }
+                // Reset search when wallpapers are reloaded
+                searchQuery = ""
                 
                 if (wallpapers.length === 0) {
                     lastError = "No wallpapers found in " + wallpaperDir
@@ -299,18 +313,23 @@ Window {
             let gridColumns = Math.max(1, Math.floor((wallpaperWindow.width - 32) / 260))
             
             switch(event.key) {
+                case Qt.Key_Slash:
+                    // Focus search field when / is pressed
+                    searchField.forceActiveFocus()
+                    event.accepted = true
+                    break
                 case Qt.Key_Left:
                     if (currentIndex > 0) {
                         currentIndex--
-                        selectedWallpaper = wallpapers[currentIndex]
+                        selectedWallpaper = filteredWallpapers[currentIndex]
                         ensureVisible()
                     }
                     event.accepted = true
                     break
                 case Qt.Key_Right:
-                    if (currentIndex < wallpapers.length - 1) {
+                    if (currentIndex < filteredWallpapers.length - 1) {
                         currentIndex++
-                        selectedWallpaper = wallpapers[currentIndex]
+                        selectedWallpaper = filteredWallpapers[currentIndex]
                         ensureVisible()
                     }
                     event.accepted = true
@@ -318,15 +337,15 @@ Window {
                 case Qt.Key_Up:
                     if (currentIndex >= gridColumns) {
                         currentIndex -= gridColumns
-                        selectedWallpaper = wallpapers[currentIndex]
+                        selectedWallpaper = filteredWallpapers[currentIndex]
                         ensureVisible()
                     }
                     event.accepted = true
                     break
                 case Qt.Key_Down:
-                    if (currentIndex + gridColumns < wallpapers.length) {
+                    if (currentIndex + gridColumns < filteredWallpapers.length) {
                         currentIndex += gridColumns
-                        selectedWallpaper = wallpapers[currentIndex]
+                        selectedWallpaper = filteredWallpapers[currentIndex]
                         ensureVisible()
                     }
                     event.accepted = true
@@ -363,6 +382,44 @@ Window {
                 }
 
                 Item { Layout.fillWidth: true }
+                
+                // Search field
+                TextField {
+                    id: searchField
+                    placeholderText: "Search wallpapers..."
+                    Layout.preferredWidth: 250
+                    text: searchQuery
+                    onTextChanged: {
+                        searchQuery = text
+                        // Reset to first item when search changes
+                        if (filteredWallpapers.length > 0) {
+                            currentIndex = 0
+                            selectedWallpaper = filteredWallpapers[0]
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 8
+                        color: colorSurfaceContainer
+                        border.color: searchField.activeFocus ? colorPrimary : colorOutline
+                        border.width: 1
+                    }
+                    color: colorOnSurface
+                    selectionColor: colorPrimary
+                    selectedTextColor: colorBackground
+                    font.pixelSize: 14
+                    
+                    Keys.onPressed: function(event) {
+                        // Allow Escape to clear search or close window
+                        if (event.key === Qt.Key_Escape) {
+                            if (searchQuery !== "") {
+                                searchQuery = ""
+                                event.accepted = true
+                            } else {
+                                mainContent.forceActiveFocus()
+                            }
+                        }
+                    }
+                }
 
                 Button {
                     id: rescanBtn
@@ -458,7 +515,7 @@ Window {
 
                     Repeater {
                         id: wallpaperGridView
-                        model: wallpapers
+                        model: filteredWallpapers
 
                         Rectangle {
                             id: wallpaperItem
@@ -564,7 +621,15 @@ Window {
                 Layout.fillWidth: true
                 
                 Text {
-                    text: wallpapers.length > 0 ? `Loaded ${wallpapers.length} wallpapers` : "Loading wallpapers..."
+                    text: {
+                        if (wallpapers.length === 0) {
+                            return "Loading wallpapers..."
+                        } else if (searchQuery !== "") {
+                            return `Showing ${filteredWallpapers.length} of ${wallpapers.length} wallpapers`
+                        } else {
+                            return `Loaded ${wallpapers.length} wallpapers`
+                        }
+                    }
                     font.pixelSize: 11
                     color: colorOutline
                 }
@@ -572,7 +637,7 @@ Window {
                 Item { Layout.fillWidth: true }
                 
                 Text {
-                    text: "Use arrow keys to navigate, Enter to apply, Esc to quit"
+                    text: "Use arrow keys to navigate, / to search, Enter to apply, Esc to quit"
                     font.pixelSize: 11
                     color: colorOutline
                     opacity: 0.7
