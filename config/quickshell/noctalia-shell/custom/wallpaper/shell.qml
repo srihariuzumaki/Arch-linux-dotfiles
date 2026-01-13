@@ -12,18 +12,15 @@ Window {
     title: "Wallpaper Picker"
     property int currentIndex: 0
 	
-    width: 900
+    width: 1000
     height: 550
 	
-    minimumWidth: 700
+    minimumWidth: 900
     minimumHeight: 450
     
     maximumWidth: 1000
     maximumHeight: 650
 	visible: true
-
-    // Add focus to enable keyboard events
-    //focus: true
 
     Component.onCompleted: {
         homeProcess.exec(["sh", "-c", "echo $HOME"])
@@ -73,69 +70,35 @@ Window {
         }
     }
 
-    // Keyboard navigation functions
-    Keys.onPressed: function(event) {
-        if (settingsOpen) return // Don't handle keys when settings dialog is open
-        
-        let gridColumns = Math.max(1, Math.floor((wallpaperWindow.width - 32) / 260))
-        
-        switch(event.key) {
-            case Qt.Key_Left:
-                if (currentIndex > 0) {
-                    currentIndex--
-                    selectedWallpaper = wallpapers[currentIndex]
-                    ensureVisible()
-                }
-                event.accepted = true
-                break
-            case Qt.Key_Right:
-                if (currentIndex < wallpapers.length - 1) {
-                    currentIndex++
-                    selectedWallpaper = wallpapers[currentIndex]
-                    ensureVisible()
-                }
-                event.accepted = true
-                break
-            case Qt.Key_Up:
-                if (currentIndex >= gridColumns) {
-                    currentIndex -= gridColumns
-                    selectedWallpaper = wallpapers[currentIndex]
-                    ensureVisible()
-                }
-                event.accepted = true
-                break
-            case Qt.Key_Down:
-                if (currentIndex + gridColumns < wallpapers.length) {
-                    currentIndex += gridColumns
-                    selectedWallpaper = wallpapers[currentIndex]
-                    ensureVisible()
-                }
-                event.accepted = true
-                break
-            case Qt.Key_Return:
-            case Qt.Key_Enter:
-                if (selectedWallpaper !== "") {
-                    applyWallpaper(selectedWallpaper)
-                }
-                event.accepted = true
-                break
-            case Qt.Key_Escape:
-                Qt.quit()
-                event.accepted = true
-                break
-        }
-    }
-
     function ensureVisible() {
-        // Scroll to make current item visible
-        let itemHeight = (wallpaperGrid.width - (wallpaperGrid.columns - 1) * wallpaperGrid.columnSpacing) / wallpaperGrid.columns * 9 / 16
-        let row = Math.floor(currentIndex / wallpaperGrid.columns)
-        let yPos = row * (itemHeight + wallpaperGrid.rowSpacing)
+        // Safety check
+        if (wallpapers.length === 0) return;
+
+        // Calculate item dimensions
+        let itemWidth = (wallpaperGrid.width - (wallpaperGrid.columns - 1) * wallpaperGrid.columnSpacing) / wallpaperGrid.columns
+        let itemHeight = itemWidth * 9 / 16
+        let rowHeight = itemHeight + wallpaperGrid.rowSpacing
         
-        if (yPos < scrollView.contentY) {
-            scrollView.contentY = yPos
-        } else if (yPos + itemHeight > scrollView.contentY + scrollView.height) {
-            scrollView.contentY = yPos + itemHeight - scrollView.height
+        // Find the row of the current index
+        let currentRow = Math.floor(currentIndex / wallpaperGrid.columns)
+        
+        // Calculate positions
+        let itemTop = currentRow * rowHeight
+        let itemBottom = itemTop + itemHeight
+
+        // Get current scroll position
+        let currentScrollY = scrollView.ScrollBar.vertical.position * (scrollView.contentHeight - scrollView.height)
+        let viewportHeight = scrollView.height
+
+        // Adjust scroll position if needed
+        if (itemTop < currentScrollY) {
+            // Item is above visible area - scroll up
+            let newPosition = itemTop / (scrollView.contentHeight - scrollView.height)
+            scrollView.ScrollBar.vertical.position = newPosition
+        } else if (itemBottom > (currentScrollY + viewportHeight)) {
+            // Item is below visible area - scroll down
+            let newPosition = (itemBottom - viewportHeight) / (scrollView.contentHeight - scrollView.height)
+            scrollView.ScrollBar.vertical.position = newPosition
         }
     }
 
@@ -323,13 +286,13 @@ Window {
             applyWallpaper(newWallpaper)
         }
     }
-	Rectangle {
+
+    Rectangle {
         id: mainContent
         anchors.fill: parent
         color: "#ae151217"
-        focus: true // This is where focus: true belongs
+        focus: true
 
-        // Move your keyboard logic here
         Keys.onPressed: function(event) {
             if (settingsOpen) return 
             
@@ -380,329 +343,329 @@ Window {
                     event.accepted = true
                     break
             }
-      
-		  }  }
-
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 16
-        spacing: 12
-
-        // Header
-        RowLayout {
-            Layout.fillWidth: true
-
-            Text {
-                text: "Select a Wallpaper"
-                font.pixelSize: 24
-                font.bold: true
-                color: colorOnSurface
-                Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-            }
-
-            Item { Layout.fillWidth: true }
-
-            Button {
-                id: rescanBtn
-                text: "Rescan"
-                onClicked: startListing()
-                background: Rectangle {
-                    radius: 8
-                    color: rescanBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (rescanBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
-                    border.color: colorOutline
-                    border.width: 1
-                }
-                contentItem: Text {
-                    text: rescanBtn.text
-                    color: colorOnSurface
-                    font.pixelSize: 14
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
-            }
-            Button {
-                id: randomBtn
-                text: "Random"
-                onClicked: randomWallpaper()
-                background: Rectangle {
-                    radius: 8
-                    color: randomBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (randomBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
-                    border.color: colorOutline
-                    border.width: 1
-                }
-                contentItem: Text {
-                    text: randomBtn.text
-                    color: colorOnSurface
-                    font.pixelSize: 14
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
-            }
-            Button {
-                id: settingsBtn
-                text: "Settings"
-                onClicked: settingsOpen = true
-                background: Rectangle {
-                    radius: 8
-                    color: settingsBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (settingsBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
-                    border.color: colorOutline
-                    border.width: 1
-                }
-                contentItem: Text {
-                    text: settingsBtn.text
-                    color: colorOnSurface
-                    font.pixelSize: 14
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
-            }
         }
 
-        // Error message
-        Rectangle {
-            visible: lastError !== ""
-            color: colorError
-            radius: 4
-            height: 40
-            Layout.fillWidth: true
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 12
 
-            Text {
-                text: lastError
-                color: colorOnSurface
-                font.pixelSize: 12
-                anchors.centerIn: parent
-            }
-        }
+            // Header
+            RowLayout {
+                Layout.fillWidth: true
 
-        // Wallpaper grid
-        ScrollView {
-            id: scrollView
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-            clip: true
+                Text {
+                    text: "Select a Wallpaper"
+                    font.pixelSize: 24
+                    font.bold: true
+                    color: colorOnSurface
+                    Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                }
 
-            property real contentY: ScrollBar.vertical.position * (contentHeight - height)
+                Item { Layout.fillWidth: true }
 
-            GridLayout {
-                id: wallpaperGrid
-                width: wallpaperWindow.width - 32
-                columns: Math.max(1, Math.floor(width / 260))
-                rowSpacing: 16
-                columnSpacing: 16
-
-                Repeater {
-                    id: wallpaperGridView
-                    model: wallpapers
-
-                    Rectangle {
-                        id: wallpaperItem
-                        width: (wallpaperGrid.width - (wallpaperGrid.columns - 1) * wallpaperGrid.columnSpacing) / wallpaperGrid.columns
-                        height: width * 9 / 16
-                        color: colorSurface
+                Button {
+                    id: rescanBtn
+                    text: "Rescan"
+                    onClicked: startListing()
+                    background: Rectangle {
                         radius: 8
-                        border.color: selectedWallpaper === modelData ? colorPrimary : "transparent"
-                        border.width: 2
+                        color: rescanBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (rescanBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
+                        border.color: colorOutline
+                        border.width: 1
+                    }
+                    contentItem: Text {
+                        text: rescanBtn.text
+                        color: colorOnSurface
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                }
+                Button {
+                    id: randomBtn
+                    text: "Random"
+                    onClicked: randomWallpaper()
+                    background: Rectangle {
+                        radius: 8
+                        color: randomBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (randomBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
+                        border.color: colorOutline
+                        border.width: 1
+                    }
+                    contentItem: Text {
+                        text: randomBtn.text
+                        color: colorOnSurface
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                }
+                Button {
+                    id: settingsBtn
+                    text: "Settings"
+                    onClicked: settingsOpen = true
+                    background: Rectangle {
+                        radius: 8
+                        color: settingsBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (settingsBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer)
+                        border.color: colorOutline
+                        border.width: 1
+                    }
+                    contentItem: Text {
+                        text: settingsBtn.text
+                        color: colorOnSurface
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                }
+            }
 
-                        // Add focus indicator
+            // Error message
+            Rectangle {
+                visible: lastError !== ""
+                color: colorError
+                radius: 4
+                height: 40
+                Layout.fillWidth: true
+
+                Text {
+                    text: lastError
+                    color: colorOnSurface
+                    font.pixelSize: 12
+                    anchors.centerIn: parent
+                }
+            }
+
+            // Wallpaper grid
+            ScrollView {
+                id: scrollView
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                clip: true
+                contentHeight: wallpaperGrid.implicitHeight
+                contentWidth: wallpaperGrid.width
+
+                GridLayout {
+                    id: wallpaperGrid
+                    width: scrollView.width - (scrollView.ScrollBar.vertical.visible ? scrollView.ScrollBar.vertical.width : 0)
+                    columns: Math.max(1, Math.floor(width / 260))
+                    rowSpacing: 16
+                    columnSpacing: 16
+
+                    Repeater {
+                        id: wallpaperGridView
+                        model: wallpapers
+
                         Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            radius: 10
-                            color: "transparent"
-                            border.color: colorPrimary
-                            border.width: currentIndex === index ? 3 : 0
-                            opacity: 0.5
-                        }
+                            id: wallpaperItem
+                            width: (wallpaperGrid.width - (wallpaperGrid.columns - 1) * wallpaperGrid.columnSpacing) / wallpaperGrid.columns
+                            height: width * 9 / 16
+                            color: colorSurface
+                            radius: 8
+                            border.color: selectedWallpaper === modelData ? colorPrimary : "transparent"
+                            border.width: 2
 
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: {
-                                currentIndex = index
-                                selectedWallpaper = modelData
-                                applyWallpaper(modelData)
+                            // Add focus indicator
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                radius: 10
+                                color: "transparent"
+                                border.color: colorPrimary
+                                border.width: currentIndex === index ? 3 : 0
+                                opacity: 0.5
                             }
-                        }
 
-                        Image {
-                            id: wallpaperImage
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            property string thumbPath: thumbnailPaths[modelData] || ""
-                            source: thumbPath ? ("file://" + thumbnailDir + "/" + thumbPath) : ""
-                            fillMode: Image.PreserveAspectCrop
-                            smooth: true
-                            asynchronous: true
-                            cache: true
-                            mipmap: true
-
-                            onStatusChanged: {
-                                if (status === Image.Error && source !== "") {
-                                    source = "file://" + wallpaperDir + "/" + modelData
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    currentIndex = index
+                                    selectedWallpaper = modelData
+                                    applyWallpaper(modelData)
                                 }
                             }
 
-                            BusyIndicator {
-                                anchors.centerIn: parent
-                                running: parent.status === Image.Loading
-                                width: 40
-                                height: 40
-                                visible: running
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 30
-                            color: "#00000066"
-                            anchors.bottom: parent.bottom
-                            radius: 0
-
-                            Text {
-                                text: modelData
-                                color: colorOnSurface
-                                font.pixelSize: 10
-                                elide: Text.ElideRight
+                            Image {
+                                id: wallpaperImage
                                 anchors.fill: parent
+                                anchors.margins: 8
+                                property string thumbPath: thumbnailPaths[modelData] || ""
+                                source: thumbPath ? ("file://" + thumbnailDir + "/" + thumbPath) : ""
+                                fillMode: Image.PreserveAspectCrop
+                                smooth: true
+                                asynchronous: true
+                                cache: true
+                                mipmap: true
+
+                                onStatusChanged: {
+                                    if (status === Image.Error && source !== "") {
+                                        source = "file://" + wallpaperDir + "/" + modelData
+                                    }
+                                }
+
+                                BusyIndicator {
+                                    anchors.centerIn: parent
+                                    running: parent.status === Image.Loading
+                                    width: 40
+                                    height: 40
+                                    visible: running
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 30
+                                color: "#00000066"
+                                anchors.bottom: parent.bottom
+                                radius: 0
+
+                                Text {
+                                    text: modelData
+                                    color: colorOnSurface
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                    anchors.fill: parent
+                                    anchors.margins: 4
+                                    verticalAlignment: Text.AlignVCenter
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+
+                            Rectangle {
+                                visible: selectedWallpaper === modelData
+                                width: 24
+                                height: 24
+                                radius: 12
+                                color: colorPrimary
+                                anchors.top: parent.top
+                                anchors.right: parent.right
                                 anchors.margins: 4
-                                verticalAlignment: Text.AlignVCenter
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-                        }
 
-                        Rectangle {
-                            visible: selectedWallpaper === modelData
-                            width: 24
-                            height: 24
-                            radius: 12
-                            color: colorPrimary
-                            anchors.top: parent.top
-                            anchors.right: parent.right
-                            anchors.margins: 4
-
-                            Text {
-                                text: "✓"
-                                color: colorBackground
-                                font.bold: true
-                                font.pixelSize: 16
-                                anchors.centerIn: parent
+                                Text {
+                                    text: "✓"
+                                    color: colorBackground
+                                    font.bold: true
+                                    font.pixelSize: 16
+                                    anchors.centerIn: parent
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Status text with keyboard hint
-        RowLayout {
-            Layout.fillWidth: true
-            
-            Text {
-                text: wallpapers.length > 0 ? `Loaded ${wallpapers.length} wallpapers` : "Loading wallpapers..."
-                font.pixelSize: 11
-                color: colorOutline
+            // Status text with keyboard hint
+            RowLayout {
+                Layout.fillWidth: true
+                
+                Text {
+                    text: wallpapers.length > 0 ? `Loaded ${wallpapers.length} wallpapers` : "Loading wallpapers..."
+                    font.pixelSize: 11
+                    color: colorOutline
+                }
+                
+                Item { Layout.fillWidth: true }
+                
+                Text {
+                    text: "Use arrow keys to navigate, Enter to apply, Esc to quit"
+                    font.pixelSize: 11
+                    color: colorOutline
+                    opacity: 0.7
+                }
             }
             
-            Item { Layout.fillWidth: true }
-            
-            Text {
-                text: "Use arrow keys to navigate, Enter to apply, Esc to quit"
-                font.pixelSize: 11
-                color: colorOutline
-                opacity: 0.7
-            }
-        }
-        
-        // Settings dialog
-        Dialog {
-            id: settingsDialog
-            visible: settingsOpen
-            modal: true
-            title: "Settings"
-            width: 720
-            height: 460
-            padding: 16
-            onVisibleChanged: if (!visible) settingsOpen = false
-            background: Rectangle {
-                radius: 12
-                color: colorSurface
-                border.color: colorOutline
-                border.width: 1
-            }
-            onAccepted: {
-                wallpaperDir = wallDirField.text.trim()
-                thumbnailDir = thumbDirField.text.trim()
-                mkdirThumbsProcess.exec(["sh","-c","mkdir -p '" + thumbnailDir + "'"])
-            }
-            contentItem: ColumnLayout {
-                spacing: 12
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label { text: "Wallpaper directory:"; color: colorOnSurface }
-                    TextField { id: wallDirField; text: wallpaperDir; Layout.fillWidth: true }
-                    Button {
-                        id: browseWallBtn
-                        text: "Browse"
-                        background: Rectangle { radius: 8; color: browseWallBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (browseWallBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
-                        contentItem: Text { text: browseWallBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        onClicked: wallpaperFolderDialog.open()
+            // Settings dialog
+            Dialog {
+                id: settingsDialog
+                visible: settingsOpen
+                modal: true
+                title: "Settings"
+                width: 720
+                height: 460
+                padding: 16
+                onVisibleChanged: if (!visible) settingsOpen = false
+                background: Rectangle {
+                    radius: 12
+                    color: colorSurface
+                    border.color: colorOutline
+                    border.width: 1
+                }
+                onAccepted: {
+                    wallpaperDir = wallDirField.text.trim()
+                    thumbnailDir = thumbDirField.text.trim()
+                    mkdirThumbsProcess.exec(["sh","-c","mkdir -p '" + thumbnailDir + "'"])
+                }
+                contentItem: ColumnLayout {
+                    spacing: 12
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: "Wallpaper directory:"; color: colorOnSurface }
+                        TextField { id: wallDirField; text: wallpaperDir; Layout.fillWidth: true }
+                        Button {
+                            id: browseWallBtn
+                            text: "Browse"
+                            background: Rectangle { radius: 8; color: browseWallBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (browseWallBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
+                            contentItem: Text { text: browseWallBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: wallpaperFolderDialog.open()
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: "Thumbnail directory:"; color: colorOnSurface }
+                        TextField { id: thumbDirField; text: thumbnailDir; Layout.fillWidth: true }
+                        Button {
+                            id: browseThumbBtn
+                            text: "Browse"
+                            background: Rectangle { radius: 8; color: browseThumbBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (browseThumbBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
+                            contentItem: Text { text: browseThumbBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: thumbnailFolderDialog.open()
+                        }
+                    }
+                    RowLayout {
+                        spacing: 16
+                        Text { text: hasFfmpeg ? "ffmpeg: OK" : "ffmpeg: not found"; color: hasFfmpeg ? "#84e1a7" : colorError }
+                        Text { text: hasMatugen ? "matugen: OK" : "matugen: not found"; color: hasMatugen ? "#84e1a7" : colorError }
                     }
                 }
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label { text: "Thumbnail directory:"; color: colorOnSurface }
-                    TextField { id: thumbDirField; text: thumbnailDir; Layout.fillWidth: true }
+                footer: DialogButtonBox {
+                    alignment: Qt.AlignRight
                     Button {
-                        id: browseThumbBtn
-                        text: "Browse"
-                        background: Rectangle { radius: 8; color: browseThumbBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (browseThumbBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
-                        contentItem: Text { text: browseThumbBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        onClicked: thumbnailFolderDialog.open()
+                        id: cancelBtn
+                        text: "Cancel"
+                        DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+                        background: Rectangle { radius: 8; color: cancelBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (cancelBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
+                        contentItem: Text { text: cancelBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    }
+                    Button {
+                        id: saveBtn
+                        text: "Save"
+                        DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+                        background: Rectangle { radius: 8; color: saveBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (saveBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
+                        contentItem: Text { text: saveBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     }
                 }
-                RowLayout {
-                    spacing: 16
-                    Text { text: hasFfmpeg ? "ffmpeg: OK" : "ffmpeg: not found"; color: hasFfmpeg ? "#84e1a7" : colorError }
-                    Text { text: hasMatugen ? "matugen: OK" : "matugen: not found"; color: hasMatugen ? "#84e1a7" : colorError }
-                }
             }
-            footer: DialogButtonBox {
-                alignment: Qt.AlignRight
-                Button {
-                    id: cancelBtn
-                    text: "Cancel"
-                    DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-                    background: Rectangle { radius: 8; color: cancelBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (cancelBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
-                    contentItem: Text { text: cancelBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                }
-                Button {
-                    id: saveBtn
-                    text: "Save"
-                    DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-                    background: Rectangle { radius: 8; color: saveBtn.down ? Qt.darker(colorSurfaceContainer, 1.3) : (saveBtn.hovered ? Qt.lighter(colorSurfaceContainer, 1.2) : colorSurfaceContainer); border.color: colorOutline; border.width: 1 }
-                    contentItem: Text { text: saveBtn.text; color: colorOnSurface; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                }
-            }
-        }
 
-        FolderDialog {
-            id: wallpaperFolderDialog
-            title: "Choose wallpaper directory"
-            onAccepted: {
-                wallpaperDir = wallpaperFolderDialog.selectedFolder
-                settingsOpen = true
+            FolderDialog {
+                id: wallpaperFolderDialog
+                title: "Choose wallpaper directory"
+                onAccepted: {
+                    wallpaperDir = wallpaperFolderDialog.selectedFolder
+                    settingsOpen = true
+                }
             }
-        }
-        FolderDialog {
-            id: thumbnailFolderDialog
-            title: "Choose thumbnail directory"
-            onAccepted: {
-                thumbnailDir = thumbnailFolderDialog.selectedFolder
-                settingsOpen = true
+            FolderDialog {
+                id: thumbnailFolderDialog
+                title: "Choose thumbnail directory"
+                onAccepted: {
+                    thumbnailDir = thumbnailFolderDialog.selectedFolder
+                    settingsOpen = true
+                }
             }
         }
     }
