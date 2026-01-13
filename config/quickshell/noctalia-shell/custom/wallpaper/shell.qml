@@ -32,20 +32,23 @@ Window {
             }
         }
         
+        // Load system colors
+        loadSystemColors()
+        
         homeProcess.exec(["sh", "-c", "echo $HOME"])
 		mainContent.forceActiveFocus()
     }
 
     color: transparent
 
-    // Color scheme
-    readonly property color colorBackground: "#151217"
-    readonly property color colorSurface: "#221e24"
-    readonly property color colorSurfaceContainer: "#2c292e"
-    readonly property color colorOnSurface: "#e8e0e8"
-    readonly property color colorPrimary: "#dcb9f8"
-    readonly property color colorError: "#ffb4ab"
-    readonly property color colorOutline: "#4a454d"
+    // Color scheme - will be loaded from system theme
+    property color colorBackground: "#151217"
+    property color colorSurface: "#221e24"
+    property color colorSurfaceContainer: "#2c292e"
+    property color colorOnSurface: "#e8e0e8"
+    property color colorPrimary: "#dcb9f8"
+    property color colorError: "#ffb4ab"
+    property color colorOutline: "#4a454d"
 
     // Configuration
     property string homeDir: ""
@@ -162,6 +165,48 @@ Window {
     function isFavorite(wallpaperName) {
         return favorites.indexOf(wallpaperName) !== -1
     }
+    
+    function loadSystemColors() {
+        colorLoadProcess.exec(["sh", "-c", "cat ~/.config/hypr/colors.conf 2>/dev/null || echo ''"])
+    }
+    
+    function parseColor(colorStr) {
+        // Parse rgb(rrggbb) format
+        let match = colorStr.match(/rgb\(([0-9a-fA-F]{6})\)/)
+        if (match) {
+            return "#" + match[1]
+        }
+        return colorStr
+    }
+
+    // Process for loading system colors
+    Io.Process {
+        id: colorLoadProcess
+        command: []
+        stdout: Io.StdioCollector { id: colorCollector }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode === 0 && colorCollector.text.length > 0) {
+                let lines = colorCollector.text.split("\n")
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i].trim()
+                    if (line.startsWith("$primary")) {
+                        colorPrimary = parseColor(line.split("=")[1].trim())
+                    } else if (line.startsWith("$surface =")) {
+                        colorSurface = parseColor(line.split("=")[1].trim())
+                        // Derive surface container as slightly lighter
+                        colorSurfaceContainer = Qt.lighter(colorSurface, 1.2)
+                    } else if (line.startsWith("$error")) {
+                        colorError = parseColor(line.split("=")[1].trim())
+                    } else if (line.startsWith("$surface_lowest")) {
+                        colorBackground = parseColor(line.split("=")[1].trim())
+                    }
+                }
+                // Derive other colors
+                colorOnSurface = Qt.lighter(colorSurface, 5.0)
+                colorOutline = Qt.lighter(colorSurface, 1.5)
+            }
+        }
+    }
 
     // Process for getting home directory
     Io.Process {
@@ -201,12 +246,25 @@ Window {
         onExited: function(exitCode, exitStatus) {
             if (exitCode === 0) {
                 showNotification("Wallpaper Applied", "Wallpaper '" + selectedWallpaper + "' applied successfully", "dialog-information")
-                wallpaperWindow.visible = false
-                Qt.quit()
+                // Reload colors after matugen generates new theme
+                loadSystemColors()
+                // Wait a bit to show the new colors before quitting
+                quitTimer.start()
             } else {
                 lastError = "Failed to apply wallpaper"
                 showNotification("Error", lastError, "dialog-error")
             }
+        }
+    }
+    
+    // Timer to delay quit and show new colors
+    Timer {
+        id: quitTimer
+        interval: 500
+        repeat: false
+        onTriggered: {
+            wallpaperWindow.visible = false
+            Qt.quit()
         }
     }
 
@@ -353,7 +411,7 @@ Window {
     Rectangle {
         id: mainContent
         anchors.fill: parent
-        color: "#ae151217"
+        color: Qt.rgba(colorBackground.r, colorBackground.g, colorBackground.b, 0.95)
         focus: true
 
         Keys.onPressed: function(event) {
@@ -433,7 +491,7 @@ Window {
                     text: "Select a Wallpaper"
                     font.pixelSize: 24
                     font.bold: true
-                    color: colorOnSurface
+                    color: "#ffffff"
                     Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
                 }
 
